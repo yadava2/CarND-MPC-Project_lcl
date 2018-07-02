@@ -2,7 +2,90 @@
 Self-Driving Car Engineer Nanodegree Program
 
 ---
+# Model Predictive Controller (MPC)
 
+---
+
+In this project I have tried to improve upon the [PID project](https://github.com/coldKnight/CarND-PID-Control-Project) by implementing a MPC to drive the car around the track. The result was a much smoother driving.
+
+## Output
+
+Click to view the video
+
+[![Final results with the implementation](https://github.com/yadava2/CarND-MPC-Project_lcl/blob/master/writeup/Pic.PNG)](https://github.com/yadava2/CarND-MPC-Project_lcl/blob/master/writeup/video.mov)
+
+
+## The Model
+The Model Predictive Controller (MPC) calculates the trajectory, actuations and sends back
+ steering to the simulator. <br/>
+The state vector of the vehicle is given as:
+```
+x - Vehicle position in forward direction
+y - Vehicle position in lateral direction
+psi - Angle of the vehicle (yaw angle)
+v - Vehicle's speed
+cte - cross-track error
+epsi - orientation error
+
+And the actuators are:
+delta - Steering angle (radians)
+a - acceleration
+
+Lf - the distance between the center of mass of the vehicle and the front wheels.
+```
+
+The model is expressed by the following equations:
+
+```
+      x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
+      y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
+      psi_[t+1] = psi[t] + v[t] * delta[t] / Lf * dt
+      v_[t+1] = v[t] + a[t] * dt
+      cte[t+1] = f(x[t]) - y[t] + v[t] * sin(epsi[t]) * dt
+      epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
+```
+
+## Polynomial Fitting and MPC Preprocessing
+The waypoints are transformed to vehicle coordinate system by translation and rotation. 
+X axis aligns with the heading direction. This transformation allows to perform 
+calculations consistently in vehicle coordinate system.
+```
+   car_x = (ptsx[i] - px) * cos(psi) + (ptsy[i] - py) * sin(psi);
+   car_y = (ptsy[i] - py) * cos(psi) - (ptsx[i] - px) * sin(psi);
+```
+
+A third degree polynomial was used to compute the trajectory of the car. As mentioned in the 
+lectures, most of the real world roads can be fitted with a third degree polynomial.
+A second degree polynomial might have led to underfitting, whereas a greater degree 
+polynomial might lead to overfitting.
+
+## Timestep Length and Elapsed Duration (N & dt)
+Timestep Length and Frequency were chosen by trial and error.
+I started with 10 timesteps (`N`) of 0.1 duration (`dt`) with a speed of 30 mph. 
+However, there was a lot of erratic driving behavior with these values. Increasing thr value
+ of `N` made matters worse. Increasing the value of `dt` led to some improvements.
+Soon I figured that the faster we want to go, the futher we must be able to look and a 
+higher `dt` made the driving smoother.
+With this in mind, I finally set the `N` to 10 and `dt` to 0.2 as that gave me the best
+driving behavior at a speed of 30 mph.
+
+## Model Predictive Control with Latency
+A latency of 100ms is artificially added before sending actuations to the simulator to simulate
+real world conditions. 
+Failure to handle the latency problem might lead to unrealistic trajectories and erratic driving
+ behavior.
+ 
+Use the update equations and model errors in order to factor latency in the state vector. 
+
+```
+    Lf=2.67, latency=0.1 sec
+    x_dl = (0.0 + v * latency);
+    y_dl = 0.0;
+    psi_dl = 0.0 + v * steer_value_input / Lf * latency;
+    v_dl = 0.0 + v + throttle_value_input * latency;
+    cte_dl = cte + (v * sin(epsi) * latency);
+    epsi_dl = epsi + v * steer_value_input / Lf * latency;
+```
 ## Dependencies
 
 * cmake >= 3.5
